@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR Code Generator — Vanilla JS + Tailwind</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- QR library: qrcode (works with canvas and dataURL) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <style>
+    /* Small utility so the preview box stays square and centered */
+    .preview-wrap { width: 100%; max-width: 420px; }
+    .square { aspect-ratio: 1 / 1; }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen flex items-center justify-center p-6">
+  <main class="w-full max-w-5xl mx-auto">
+    <div class="bg-white dark:bg-gray-800 shadow-lg rounded-2xl p-6 grid gap-6 md:grid-cols-2 md:items-start">
+      <!-- Left: Controls -->
+      <section>
+        <h1 class="text-2xl font-semibold text-teal-600">QR Code Generator</h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Vanilla JS + Tailwind. Type text, change size/color, then download or copy.</p>
+
+        <label class="block mt-6">
+          <span class="text-sm font-medium">Text / URL</span>
+          <textarea id="textInput" rows="4" class="mt-2 block w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-teal-300" placeholder="https://example.com or any text">https://branvize.co</textarea>
+        </label>
+
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <div>
+            <label class="text-sm font-medium">Size (px)</label>
+            <input id="sizeRange" type="range" min="120" max="1200" value="320" class="w-full mt-2" />
+            <div class="flex items-center justify-between text-xs text-gray-500 mt-1"><span>120</span><span id="sizeVal">320</span><span>1200</span></div>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium">Margin</label>
+            <input id="marginRange" type="range" min="0" max="40" value="2" class="w-full mt-2" />
+            <div class="flex items-center justify-between text-xs text-gray-500 mt-1"><span>0</span><span id="marginVal">2</span><span>40</span></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <div>
+            <label class="text-sm font-medium">Error Correction</label>
+            <select id="ecLevel" class="mt-2 block w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-2 text-sm focus:outline-none">
+              <option value="L">L — Low (7%)</option>
+              <option value="M" selected>M — Medium (15%)</option>
+              <option value="Q">Q — Quartile (25%)</option>
+              <option value="H">H — High (30%)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium">Light / Dark Mode</label>
+            <div class="mt-2 flex gap-2">
+              <button id="themeToggle" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm">Toggle</button>
+              <button id="invertBtn" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm">Invert Colors</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <div>
+            <label class="text-sm font-medium">Foreground Color</label>
+            <input id="fgColor" type="color" value="#000000" class="mt-2 w-full h-10 rounded-md p-0 border-0" />
+          </div>
+          <div>
+            <label class="text-sm font-medium">Background Color</label>
+            <input id="bgColor" type="color" value="#ffffff" class="mt-2 w-full h-10 rounded-md p-0 border-0" />
+          </div>
+        </div>
+
+        <div class="flex gap-3 mt-4">
+          <button id="generateBtn" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-lg px-4 py-2 font-medium">Generate</button>
+          <button id="clearBtn" class="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2">Clear</button>
+        </div>
+
+        <div class="flex gap-3 mt-3">
+          <button id="downloadBtn" class="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2">Download PNG</button>
+          <button id="copyBtn" class="flex-1 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2">Copy Text</button>
+        </div>
+
+        <div class="mt-4 text-xs text-gray-500">
+          Tip: Use a URL starting with <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">https://</code> for link scanning in camera apps. Increase error correction if the QR will be printed on textured surfaces.
+        </div>
+
+        <div class="mt-4 flex gap-2 flex-wrap">
+          <button class="sampleBtn px-3 py-1 text-sm rounded-full bg-gray-100 dark:bg-gray-700" data-sample="Hello from Branvize!">Sample Text</button>
+          <button class="sampleBtn px-3 py-1 text-sm rounded-full bg-gray-100 dark:bg-gray-700" data-sample="https://github.com">GitHub</button>
+          <button class="sampleBtn px-3 py-1 text-sm rounded-full bg-gray-100 dark:bg-gray-700" data-sample="mailto:hello@branvize.co">Email</button>
+        </div>
+      </section>
+
+      <!-- Right: Preview -->
+      <section class="flex flex-col items-center">
+        <div class="w-full preview-wrap text-center">
+          <div class="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 flex flex-col items-center shadow-inner">
+            <div class="w-full flex justify-between items-center mb-2">
+              <h2 class="text-sm font-medium">Preview</h2>
+              <div class="text-xs text-gray-500">Rendered on canvas</div>
+            </div>
+
+            <div id="previewBox" class="w-full flex items-center justify-center rounded-lg bg-white dark:bg-gray-800 p-4">
+              <!-- Canvas will be injected here -->
+              <canvas id="qrCanvas" class="square rounded-md shadow"></canvas>
+            </div>
+
+            <div class="mt-3 w-full flex items-center justify-between">
+              <div class="text-xs text-gray-500">Size: <span id="infoSize">320</span>px</div>
+              <div class="text-xs text-gray-500">Error: <span id="infoEC">M</span></div>
+            </div>
+
+            <div class="mt-4 w-full flex gap-2 justify-center">
+              <button id="zoomIn" class="px-3 py-1 rounded-lg border">+ Zoom</button>
+              <button id="zoomOut" class="px-3 py-1 rounded-lg border">- Zoom</button>
+              <button id="fitBtn" class="px-3 py-1 rounded-lg border">Fit</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 text-sm text-gray-500">Right-click the image or use Download to save as PNG.</div>
+      </section>
+    </div>
+
+    <footer class="mt-6 text-center text-xs text-gray-400">Built with Vanilla JS & Tailwind — Branvize</footer>
+  </main>
+
+  <script>
+    // Elements
+    const textInput = document.getElementById('textInput');
+    const generateBtn = document.getElementById('generateBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const copyBtn = document.getElementById('copyBtn');
+    const sizeRange = document.getElementById('sizeRange');
+    const sizeVal = document.getElementById('sizeVal');
+    const marginRange = document.getElementById('marginRange');
+    const marginVal = document.getElementById('marginVal');
+    const ecLevel = document.getElementById('ecLevel');
+    const fgColor = document.getElementById('fgColor');
+    const bgColor = document.getElementById('bgColor');
+    const qrCanvas = document.getElementById('qrCanvas');
+    const infoSize = document.getElementById('infoSize');
+    const infoEC = document.getElementById('infoEC');
+    const sampleBtns = document.querySelectorAll('.sampleBtn');
+    const themeToggle = document.getElementById('themeToggle');
+    const invertBtn = document.getElementById('invertBtn');
+
+    // State
+    let currentSize = parseInt(sizeRange.value, 10);
+    let currentMargin = parseInt(marginRange.value, 10);
+    let currentZoom = 1;
+
+    // Initialize display values
+    sizeVal.textContent = currentSize;
+    infoSize.textContent = currentSize;
+    marginVal.textContent = currentMargin;
+    infoEC.textContent = ecLevel.value;
+
+    // Helper: generate QR on canvas using qrcode lib
+    async function generateQR() {
+      const text = textInput.value.trim();
+      if (!text) {
+        // clear canvas
+        const ctx = qrCanvas.getContext('2d');
+        ctx.clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+        return;
+      }
+
+      const options = {
+        errorCorrectionLevel: ecLevel.value,
+        margin: currentMargin,
+        color: { dark: fgColor.value, light: bgColor.value },
+        width: currentSize
+      };
+
+      // QRCode.toCanvas(canvas, data, options, cb)
+      try {
+        await QRCode.toCanvas(qrCanvas, text, options);
+        // adjust canvas display size for zoom
+        qrCanvas.style.width = Math.round(currentSize * currentZoom) + 'px';
+        qrCanvas.style.height = 'auto';
+        infoSize.textContent = currentSize;
+        infoEC.textContent = ecLevel.value;
+      } catch (err) {
+        console.error('QR generation error', err);
+        alert('Failed to generate QR code: ' + err.message);
+      }
+    }
+
+    // Events
+    generateBtn.addEventListener('click', () => {
+      currentZoom = 1;
+      generateQR();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      textInput.value = '';
+      generateQR();
+    });
+
+    sizeRange.addEventListener('input', (e) => {
+      currentSize = parseInt(e.target.value, 10);
+      sizeVal.textContent = currentSize;
+      // set canvas internal size so QR lib can draw crisp image
+      qrCanvas.width = currentSize;
+      qrCanvas.height = currentSize;
+      generateQR();
+    });
+
+    marginRange.addEventListener('input', (e) => {
+      currentMargin = parseInt(e.target.value, 10);
+      marginVal.textContent = currentMargin;
+      generateQR();
+    });
+
+    ecLevel.addEventListener('change', generateQR);
+    fgColor.addEventListener('input', generateQR);
+    bgColor.addEventListener('input', generateQR);
+
+    // Download PNG
+    downloadBtn.addEventListener('click', () => {
+      try {
+        const mime = 'image/png';
+        const dataUrl = qrCanvas.toDataURL(mime);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'qr-' + Date.now() + '.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (err) {
+        console.error('Download failed', err);
+        alert('Unable to download. Generate the QR first.');
+      }
+    });
+
+    // Copy text to clipboard
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(textInput.value || '');
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => (copyBtn.textContent = 'Copy Text'), 1200);
+      } catch (err) {
+        console.error('Copy failed', err);
+        alert('Unable to copy text — permission denied.');
+      }
+    });
+
+    // Zoom controls
+    document.getElementById('zoomIn').addEventListener('click', () => {
+      currentZoom = Math.min(3, currentZoom + 0.25);
+      qrCanvas.style.width = Math.round(currentSize * currentZoom) + 'px';
+    });
+    document.getElementById('zoomOut').addEventListener('click', () => {
+      currentZoom = Math.max(0.25, currentZoom - 0.25);
+      qrCanvas.style.width = Math.round(currentSize * currentZoom) + 'px';
+    });
+    document.getElementById('fitBtn').addEventListener('click', () => {
+      currentZoom = 1;
+      qrCanvas.style.width = Math.round(currentSize) + 'px';
+    });
+
+    // Sample text buttons
+    sampleBtns.forEach(b => {
+      b.addEventListener('click', () => {
+        textInput.value = b.dataset.sample;
+        generateQR();
+      });
+    });
+
+    // Theme toggle (light/dark)
+    themeToggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+    });
+
+    // Invert foreground/background
+    invertBtn.addEventListener('click', () => {
+      const fg = fgColor.value;
+      const bg = bgColor.value;
+      fgColor.value = bg;
+      bgColor.value = fg;
+      generateQR();
+    });
+
+    // Initialize canvas size and draw initial QR
+    (function init() {
+      qrCanvas.width = currentSize;
+      qrCanvas.height = currentSize;
+      qrCanvas.style.width = currentSize + 'px';
+      generateQR();
+    })();
+
+    // Accessibility: allow Enter in textarea to generate
+    textInput.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') {
+        generateQR();
+      }
+    });
+  </script>
+</body>
+</html>
